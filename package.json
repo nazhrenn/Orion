@@ -19,7 +19,7 @@
     "chai": "^3.4.0",
     "mocha": "^2.3.3"
   },
-  "main": "app.js",
+  "main": "src/orion.js",
   "name": "Orion",
   "scripts": {
     "test": "mocha tests/test -R html-cov > coverage.html"

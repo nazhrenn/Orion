@@ -20,8 +20,20 @@ module.exports = (function () {
 		/***
 		 * Adds a System to the engine.
 		 */
-		this.createSystem = function (components) {
+		this.createSystem = function (components, options) {
 			var system = new System(components);
+			
+			if (!!options.before) {
+				system.before = options.before;
+			}
+
+			if (!!options.act) {
+				system.act = options.act;
+			}
+			
+			if (!!options.after) {
+				system.after = options.after;
+			}
 
 			this.systems.push(system)
 
@@ -32,7 +44,7 @@ module.exports = (function () {
 		 */
 		this.run = function(interval, maxSteps) {
 			var self = this;
-			if (maxSteps === null) {
+			if (maxSteps === null || maxSteps === undefined) {
 				maxSteps = 0;
 			}
 			if (this.steps === 0) {

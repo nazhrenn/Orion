@@ -24,15 +24,12 @@ describe("Engine", function () {
 	describe("with a system", function () {
 		var game = new orion.Engine();
 		
-		var phys = (function (base) {
-			
-			base.act = function (e, pos, vel) {
+		var phys = game.createSystem([PositionComponent, VelocityComponent], {
+			act: function (e, pos, vel) {
 				pos.x += vel.x;
 				pos.y += vel.y;
-			};
-			
-			return base;
-		}(game.createSystem([PositionComponent, VelocityComponent])));
+			}
+		});
 
 		var e = game.createEntity();
 		e.addComponent(new VelocityComponent(3, 0));
