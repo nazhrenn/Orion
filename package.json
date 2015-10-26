@@ -20,7 +20,8 @@
     "mocha": "^2.3.3"
   },
   "main": "src/orion.js",
-  "name": "Orion",
+  "name": "Orion ECS",
+  "private": true,
   "scripts": {
     "test": "mocha tests/test -R html-cov > coverage.html"
   },
