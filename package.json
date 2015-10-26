@@ -23,7 +23,7 @@
     "mocha": "^2.3.3"
   },
   "main": "src/orion.js",
-  "name": "OrionECS",
+  "name": "orion-ecs",
   "repository": {
     "type": "git",
     "url": "https://github.com/nazhrenn/OrionECS"
