@@ -12,7 +12,8 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>1e39c7e4-ec44-4f49-9846-f99677f3572d</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>app.js</StartupFile>
+    <StartupFile>
+    </StartupFile>
     <StartWebBrowser>False</StartWebBrowser>
     <SearchPath>
     </SearchPath>
@@ -30,16 +31,11 @@
     <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="app.js" />
-    <Content Include="src\engine.js" />
     <Content Include="src\orion.js" />
     <Content Include="src\entity.js" />
-    <Content Include="src\component.js" />
     <Content Include="src\system.js" />
     <Content Include="package.json" />
     <Content Include="README.md" />
-    <Compile Include="tests\position.js" />
-    <Compile Include="tests\velocity.js" />
     <Compile Include="tests\test.js">
       <TestFramework>Mocha</TestFramework>
     </Compile>
