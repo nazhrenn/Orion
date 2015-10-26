@@ -1,6 +1,6 @@
 {
   "author": {
-    "name": "Tyler",
+    "name": "nazhrenn",
     "email": "nazhrenn@gmail.com"
   },
   "blanket": {
@@ -11,6 +11,9 @@
       ""
     ]
   },
+  "bugs": {
+    "url": "https://github.com/nazhrenn/OrionECS/issues"
+  },
   "dependencies": {
   },
   "description": "Orion",
@@ -20,8 +23,11 @@
     "mocha": "^2.3.3"
   },
   "main": "src/orion.js",
-  "name": "Orion ECS",
-  "private": true,
+  "name": "OrionECS",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nazhrenn/OrionECS"
+  },
   "scripts": {
     "test": "mocha tests/test -R html-cov > coverage.html"
   },
