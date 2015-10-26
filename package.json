@@ -1,0 +1,28 @@
+{
+  "author": {
+    "name": "Tyler",
+    "email": "nazhrenn@gmail.com"
+  },
+  "blanket": {
+    "data-cover-never": [
+      "node_modules"
+    ],
+    "pattern": [
+      ""
+    ]
+  },
+  "dependencies": {
+  },
+  "description": "Orion",
+  "devDependencies": {
+    "blanket": "^1.1.9",
+    "chai": "^3.4.0",
+    "mocha": "^2.3.3"
+  },
+  "main": "app.js",
+  "name": "Orion",
+  "scripts": {
+    "test": "mocha tests/test -R html-cov > coverage.html"
+  },
+  "version": "0.0.0"
+}
