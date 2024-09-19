@@ -1,7 +1,7 @@
 {
   "author": {
-    "name": "nazhrenn",
-    "email": "nazhrenn@gmail.com"
+    "name": "Tyler Coles",
+    "email": "tyevco@gmail.com"
   },
   "blanket": {
     "data-cover-never": [
@@ -12,24 +12,20 @@
     ]
   },
   "bugs": {
-    "url": "https://github.com/nazhrenn/OrionECS/issues"
-  },
-  "dependencies": {
+    "url": "https://github.com/tyevco/orionecs/issues"
   },
   "description": "Orion",
   "devDependencies": {
-    "blanket": "^1.1.9",
-    "chai": "^3.4.0",
-    "mocha": "^2.3.3"
+    "jest":"29.7.0"
   },
   "main": "src/orion.js",
   "name": "orion-ecs",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nazhrenn/OrionECS"
+    "url": "https://github.com/tyevco/orionecs"
   },
   "scripts": {
-    "test": "mocha tests/test -R html-cov > coverage.html"
+    "test": "jest"
   },
   "version": "0.0.0"
 }

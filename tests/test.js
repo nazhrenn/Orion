@@ -1,53 +1,60 @@
-﻿var blanket = require("blanket")({
-	/* options are passed as an argument object to the require statement */
-	"pattern": "/src/"
-});
+﻿// test.js
+const orion = require("../src/orion");
 
-var expect = require("chai").expect;
+class Position {
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
+}
 
-describe("Engine", function () {
-	var orion = require("../src/orion");
+class Velocity {
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
+}
 
-	var PositionComponent = function Position(x, y) {
-		this.x = x || 0;
-		this.y = y || 0;
-	};
+describe("Engine", () => {
+  describe("with no systems", () => {
+    let game;
 
-	var VelocityComponent = function Velocity(x, y) {
-		this.x = x || 0;
-		this.y = y || 0;
-	};
-	
-	describe("with no systems", function () {
-		var game = new orion();
-		it("should run for 5 steps", function (done) {
-			game.onStop = function () {
-				expect(game.steps).to.equal(5);
-				done();
-			}
-			game.run(1, 5);
-		});
-	});
-	
-	describe("with a system", function () {
-		var game = new orion();
-		
-		var phys = game.createSystem([PositionComponent, VelocityComponent], {
-			act: function (e, pos, vel) {
-				pos.x += vel.x;
-				pos.y += vel.y;
-			}
-		});
-		
-		var e = game.createEntity();
-		e.addComponent(new VelocityComponent(3, 0));
-		e.addComponent(new PositionComponent(5, 6));
-		
-		it("should update entity's components", function () {
-			game.perform();
-			
-			expect(e.components.Velocity.x).to.equal(3);
-			expect(e.components.Position.x).to.equal(8);
-		});
-	});
+    beforeEach(() => {
+      game = new orion();
+    });
+
+    it("should run for 5 steps", (done) => {
+      game.onStop = () => {
+        expect(game.steps).toBe(5);
+        done();
+      };
+      game.run(1, 5);
+    });
+  });
+
+  describe("with a system", () => {
+    let game, e;
+
+    beforeEach(() => {
+      game = new orion();
+
+      game.createSystem([Position, Velocity], {
+        act: function (e, pos, vel) {
+          pos.x += vel.x;
+          pos.y += vel.y;
+        }
+      });
+
+      e = game.createEntity();
+      e.addComponent(new Velocity(3, 0));
+      e.addComponent(new Position(5, 6));
+    });
+
+    it("should update entity's components", () => {
+      game.perform();
+
+      expect(e.components.Velocity.x).toBe(3);
+      expect(e.components.Position.x).toBe(8);
+    });
+  });
 });
