@@ -1,6 +1,8 @@
 ﻿
-module.exports = (function () {
-	function System(componentsToPerform) {
+export class System {
+	components;
+
+	constructor(componentsToPerform) {
 		this.components = [];
 
 		for (var id in componentsToPerform) {
@@ -11,28 +13,26 @@ module.exports = (function () {
 				this.components.push(component.name);
 			}
 		}
+	}
 
-		this.before = function () { };
-		this.act = function (e) { };
-		this.after = function () { };
+	before() { };
+	act(e, ...components) { };
+	after() { };
 
-		this.step = function (entities) {
-			var length = entities.length;
-			for (var i = length - 1; i >= 0; i--) {
-				var entity = entities[i];
-				var systemArgs = [entity];
-				if (this.components.every(function (c) {
-					if (entity.hasComponent(c)) {
-						systemArgs.push(entity.components[c]);
-						return true;
-					}
-					return false;
-				})) {
-					this.act.apply(this, systemArgs);
+	step(entities) {
+		var length = entities.length;
+		for (var i = length - 1; i >= 0; i--) {
+			var entity = entities[i];
+			var componentArgs = [];
+			if (this.components.every(function (c) {
+				if (entity.hasComponent(c)) {
+					componentArgs.push(entity.components[c]);
+					return true;
 				}
+				return false;
+			})) {
+				this.act(entity, componentArgs);
 			}
 		}
-	};
-
-	return System;
-}());
+	}
+}

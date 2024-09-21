@@ -1,5 +1,5 @@
 ﻿// test.js
-const orion = require("../src/orion");
+import { Engine } from "../src/engine";
 
 class Position {
   constructor(x = 0, y = 0) {
@@ -20,7 +20,7 @@ describe("Engine", () => {
     let game;
 
     beforeEach(() => {
-      game = new orion();
+      game = new Engine();
     });
 
     it("should run for 5 steps", (done) => {
@@ -36,10 +36,10 @@ describe("Engine", () => {
     let game, e;
 
     beforeEach(() => {
-      game = new orion();
+      game = new Engine();
 
       game.createSystem([Position, Velocity], {
-        act: function (e, pos, vel) {
+        act: function (e, [pos, vel]) {
           pos.x += vel.x;
           pos.y += vel.y;
         }

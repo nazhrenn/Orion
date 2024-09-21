@@ -3,20 +3,15 @@
     "name": "Tyler Coles",
     "email": "tyevco@gmail.com"
   },
-  "blanket": {
-    "data-cover-never": [
-      "node_modules"
-    ],
-    "pattern": [
-      ""
-    ]
-  },
   "bugs": {
     "url": "https://github.com/tyevco/orionecs/issues"
   },
-  "description": "Orion",
+  "description": "",
   "devDependencies": {
-    "jest":"29.7.0"
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.4",
+    "babel-jest": "^29.7.0",
+    "jest": "29.7.0"
   },
   "main": "src/orion.js",
   "name": "orion-ecs",
