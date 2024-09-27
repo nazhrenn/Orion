@@ -22,10 +22,10 @@ npm install orion-ecs
 Here's a basic example of how to use Orion ECS:
 
 ```javascript
-const orion = require('orion-ecs');
+import { Engine } from 'orion-ecs';
 
 // Create a new engine
-const game = new orion();
+const game = new Engine();
 
 // Define components
 class Position {
@@ -44,7 +44,7 @@ class Velocity {
 
 // Create a system
 game.createSystem([Position, Velocity], {
-  act: function(entity, position, velocity) {
+  act: function(entity, [position, velocity]) {
     position.x += velocity.x;
     position.y += velocity.y;
   }
