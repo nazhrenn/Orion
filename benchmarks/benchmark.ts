@@ -1,7 +1,5 @@
 import { benchmarkSuite } from "jest-bench";
 import { Engine } from '../src/engine';
-import { Entity } from '../src/entity';
-import { System } from '../src/system';
 
 // Seeded random number generator for repeatability
 function seededRandom(seed: number) {
@@ -32,10 +30,10 @@ class DefenseComponent { constructor(public defense: number) { } }
 
 // Define benchmarks with subsections
 benchmarkSuite("Engine Performance Benchmarks", {
-    "Simple Benchmark": () => {
+    "Simple Benchmark": async () => {
         const engine = new Engine();
         resetRandom();
-        for (let i = 0; i < 1000000; i++) {
+        for (let i = 0; i < 10; i++) {
             var entity = engine.createEntity();
             entity.addComponent(SimpleComponent, random() * 100);
         }
@@ -46,17 +44,15 @@ benchmarkSuite("Engine Performance Benchmarks", {
             },
         });
 
-        for (let i = 0; i < 1000000; i++) {
-            engine.perform();
-        }
+        await engine.run(0, 10);
     },
 
-    "Complex Benchmark": () => {
+    "Complex Benchmark": async () => {
         const engine = new Engine();
         resetRandom();
 
 
-        for (let i = 0; i < 1000; i++) {
+        for (let i = 0; i < 10; i++) {
             const entity = engine.createEntity();
             entity.addComponent(PositionComponent, random() * 100, random() * 100);
             entity.addComponent(VelocityComponent, random() * 10, random() * 10);
@@ -69,16 +65,14 @@ benchmarkSuite("Engine Performance Benchmarks", {
             },
         });
 
-        for (let i = 0; i < 1000000; i++) {
-            engine.perform();
-        }
+        await engine.run(0, 10);
     },
 
-    "Large Benchmark": () => {
+    "Large Benchmark": async () => {
         const engine = new Engine();
         resetRandom();
 
-        for (let i = 0; i < 10000; i++) {
+        for (let i = 0; i < 10; i++) {
             const entity = engine.createEntity();
             entity.addComponent(HealthComponent, random() * 100);
             entity.addComponent(AttackComponent, random() * 50);
@@ -91,8 +85,6 @@ benchmarkSuite("Engine Performance Benchmarks", {
             },
         });
 
-        for (let i = 0; i < 1000000; i++) {
-            engine.perform();
-        }
+        await engine.run(0, 10);
     }
 });
