@@ -1,4 +1,4 @@
-﻿import type { ComponentIdentifier, EngineEvents, EntityDef, EventCallback, SystemType } from "./definitions";
+﻿import type { ComponentIdentifier, EngineEventNames, EngineEvents, EntityDef, EventCallback, SystemType } from "./definitions";
 
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -43,11 +43,15 @@ class EntityManager {
     );
 
     public createEntity(): Entity {
-        return this.entityPool.acquire();
+        const entity = this.entityPool.acquire();
+        this.activeEntities.set(entity.id, entity);
+        this.notifySystems('onEntityCreated', entity);
+        return entity;
     }
 
     public releaseEntity(entity: Entity): void {
         this.entityPool.release(entity);
+        this.notifySystems('onEntityReleased', entity);
     }
 
     public registerSystem(system: System): void {
@@ -66,6 +70,14 @@ class EntityManager {
     //         }
     //     }
     // }
+
+    private notifySystems(eventName: 'onEntityCreated' | 'onEntityReleased', entity: Entity): void {
+        for (const system of this.systems) {
+            if (typeof system[eventName] === 'function') {
+                system[eventName](entity);
+            }
+        }
+    }
 
     public cleanup(): void {
         this.activeEntities.forEach(entity => {
@@ -147,9 +159,14 @@ class Entity implements EntityDef {
 
 class System<C extends any[] = any> {
     private components: string[];
+    private entitySymbols: Set<symbol> = new Set();
 
     constructor(private engine: Engine, ...componentsToPerform: { [K in keyof C]: ComponentIdentifier<C[K]> }) {
         this.components = componentsToPerform.map(component => System.getComponentName(component));
+        
+        // Subscribe to entity creation and release events
+        this.engine.on('entityCreated', this.onEntityCreated.bind(this));
+        this.engine.on('entityReleased', this.onEntityReleased.bind(this));
     }
 
     private static getComponentName(component: ComponentIdentifier): string {
@@ -164,27 +181,36 @@ class System<C extends any[] = any> {
         throw new Error("Invalid component identifier");
     }
 
-    // The act function now takes typed components based on the passed component identifiers
-    act(entity: EntityDef, ...components: C): void { }
+    onEntityCreated(entity: Entity): void {
+        if (this.components.every(c => entity.hasComponent(c))) {
+            this.entitySymbols.add(entity.id); // Store the symbol
+        }
+    }
+
+    onEntityReleased(entity: Entity): void {
+        this.entitySymbols.delete(entity.id); // Remove the symbol
+    }
+
+    act(entity: EntityDef, ...components: C): void {
+        // Implement your logic for acting on entities here
+    }
 
     step(entities: EntityDef[]): void {
-        for (let i = entities.length - 1; i >= 0; i--) {
-            const entity = entities[i];
-            const componentArgs: C = [] as unknown as C; // Enforce typing
+        for (const symbol of this.entitySymbols) {
+            const entity = entities.find(e => e.id === symbol);
+            if (entity) {
+                const componentArgs: C = [] as unknown as C; // Enforce typing
 
-            if (this.components.every(c => {
-                if (entity.hasComponent(c)) {
-                    componentArgs.push(entity.getComponent(c) as any); // Cast to match the type
-                    return true;
-                }
-                return false;
-            })) {
+                componentArgs.push(...this.components.map(c => entity.getComponent(c) as any));
                 this.act(entity, ...componentArgs); // Call act with typed components
             }
         }
     }
-}
 
+    get storedEntitySymbols(): Set<symbol> {
+        return this.entitySymbols; // Allow access to the stored symbols
+    }
+}
 
 export class Engine {
     private _entities: EntityDef[] = [];
@@ -235,7 +261,7 @@ export class Engine {
     }
 
     private async runInternal(interval: number, maxSteps: number = 0, onComplete?: () => void): Promise<void> {
-        this.dispatchSystemEvent('onStart')
+        this.on('onStart')
 
         while (this._active) {
             this.perform();
@@ -247,12 +273,12 @@ export class Engine {
             }
         }
 
-        this.dispatchSystemEvent('onStop')
+        this.on('onStop')
 
         onComplete && onComplete();
     }
 
-    private dispatchSystemEvent(eventName: keyof EngineEvents, ...args: any[]): void {
+    on(eventName: EngineEventNames, ...args: any[]): void {
         for (const system of this._systems) {
             const method = system[eventName as keyof typeof system] as Function;
             if (typeof method === "function") {

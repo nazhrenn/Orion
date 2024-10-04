@@ -18,7 +18,10 @@ export interface EngineEvents {
     afterAct: EventCallback;
 }
 
+export type EngineEventNames = keyof EngineEvents | 'entityCreated' | 'entityReleased' | 'componentAdded' | 'componentRemoved';
+
 export interface EntityDef {
+    id: symbol;
     queueFree(): void;
     addComponent<T>(type: new (...args: any[]) => T, ...args: ConstructorParameters<typeof type>): this;
     removeComponent(componentName: string): this;
