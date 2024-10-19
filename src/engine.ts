@@ -118,7 +118,7 @@ class Entity implements EntityDef {
         return this._id;
     }
 
-    addComponent<T>(type: new (...args: any[]) => T, ...args: ConstructorParameters<typeof type>): this {
+    addComponent<T>(type: ComponentIdentifier<T>, ...args: ConstructorParameters<typeof type>): this {
         if (!this._componentIndices.has(type)) {
             const componentArray = this.engine.getComponentArray(type);
             const index = componentArray.add(new type(...args));
@@ -129,7 +129,7 @@ class Entity implements EntityDef {
         return this;
     }
 
-    removeComponent<T>(type: new (...args: any[]) => T): this {
+    removeComponent<T>(type: ComponentIdentifier<T>): this {
         const index = this._componentIndices.get(type);
         if (index !== undefined) {
             const componentArray = this.engine.getComponentArray(type);
@@ -141,11 +141,11 @@ class Entity implements EntityDef {
         return this;
     }
 
-    hasComponent<T>(type: new (...args: any[]) => T): boolean {
+    hasComponent<T>(type: ComponentIdentifier<T>): boolean {
         return this._componentIndices.has(type);
     }
 
-    getComponent<T>(type: new (...args: any[]) => T): T {
+    getComponent<T>(type: ComponentIdentifier<T>): T {
         const index = this._componentIndices.get(type);
         if (index === undefined) {
             throw new Error(`Component ${type.name} not found on entity`);
@@ -211,7 +211,7 @@ class System<C extends any[] = any> {
         this.entitySymbols.delete(entity.id); // Remove the symbol
     }
 
-    onComponentAdded(entity: Entity, componentType: ComponentIdentifier) {
+    onComponentAdded<T>(entity: Entity, componentType: ComponentIdentifier<T>) {
         if (this.components.includes(componentType)
             && !this.entitySymbols.has(entity.id)
             && this.components.every(c => entity.hasComponent(c))) {
@@ -219,7 +219,7 @@ class System<C extends any[] = any> {
         }
     }
 
-    onComponentRemoved(entity: Entity, componentType: ComponentIdentifier) {
+    onComponentRemoved<T>(entity: Entity, componentType: ComponentIdentifier<T>) {
         if (this.components.includes(componentType)
             && this.entitySymbols.has(entity.id)
             && !this.components.every(c => entity.hasComponent(c))) {
@@ -314,7 +314,7 @@ export class Engine {
 
     private componentArrays: Map<Function, ComponentArray<any>> = new Map();
 
-    getComponentArray<T>(type: new (...args: any[]) => T): ComponentArray<T> {
+    getComponentArray<T>(type: ComponentIdentifier): ComponentArray<T> {
         if (!this.componentArrays.has(type)) {
             this.componentArrays.set(type, new ComponentArray<T>());
         }
