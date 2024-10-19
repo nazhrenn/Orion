@@ -66,30 +66,13 @@ class EntityManager {
     public createEntity(): Entity {
         const entity = this.entityPool.acquire();
         this.activeEntities.set(entity.id, entity);
-        this.notifySystems('onEntityCreated', entity);
+        this.engine.triggerEvent('onEntityCreated', entity);
         return entity;
     }
 
     public releaseEntity(entity: Entity): void {
         this.entityPool.release(entity);
-        this.notifySystems('onEntityReleased', entity);
-    }
-
-    // public updateSystems(entity: Entity): void {
-    //     for (const system of this.systems) {
-    //         const matchesSystem = Array.from(system.requiredComponents).every(componentType =>
-    //             entity.hasComponent(componentType.name));
-
-    //         if (matchesSystem) {
-    //             system.entities.add(entity);
-    //         } else {
-    //             system.entities.delete(entity);
-    //         }
-    //     }
-    // }
-
-    private notifySystems(eventName: 'onEntityCreated' | 'onEntityReleased', entity: Entity): void {
-        this.engine.triggerEvent(eventName, entity);
+        this.engine.triggerEvent('onEntityReleased', entity);
     }
 
     public cleanup(): void {
@@ -183,61 +166,24 @@ class Entity implements EntityDef {
     }
 }
 
-class System<C extends any[] = any> {
+class System<C extends any[] = any[]> {
+    private query: Query<C>;
     private components: ComponentIdentifier[];
     private entitySymbols: Set<symbol> = new Set();
 
-    constructor(private engine: Engine, ...componentsToPerform: { [K in keyof C]: ComponentIdentifier<C[K]> }) {
-        this.components = componentsToPerform.map(component => {
-            if (typeof component === "function") {
-                return component;
-            } else {
-                throw new Error("Invalid component identifier");
-            }
-        });
-
-        // Subscribe to entity creation and release events
-        this.engine.registerEvent('onEntityCreated', this.onEntityCreated.bind(this));
-        this.engine.registerEvent('onEntityReleased', this.onEntityReleased.bind(this));
-    }
-
-    onEntityCreated(entity: Entity): void {
-        if (this.components.every(c => entity.hasComponent(c))) {
-            this.entitySymbols.add(entity.id); // Store the symbol
-        }
-    }
-
-    onEntityReleased(entity: Entity): void {
-        this.entitySymbols.delete(entity.id); // Remove the symbol
-    }
-
-    onComponentAdded<T>(entity: Entity, componentType: ComponentIdentifier<T>) {
-        if (this.components.includes(componentType)
-            && !this.entitySymbols.has(entity.id)
-            && this.components.every(c => entity.hasComponent(c))) {
-            this.entitySymbols.add(entity.id); // Store the symbol
-        }
-    }
-
-    onComponentRemoved<T>(entity: Entity, componentType: ComponentIdentifier<T>) {
-        if (this.components.includes(componentType)
-            && this.entitySymbols.has(entity.id)
-            && !this.components.every(c => entity.hasComponent(c))) {
-            this.entitySymbols.delete(entity.id); // Store the symbol
-        }
+    constructor(private engine: Engine, ...components: { [K in keyof C]: ComponentIdentifier<C[K]> }) {
+        this.query = engine.createQuery<C>(components);
+        this.components = components;
     }
 
     act(entity: EntityDef, ...components: C): void {
         // Implement your logic for acting on entities here
     }
 
-    step(entities: EntityDef[]): void {
-        for (const symbol of this.entitySymbols) {
-            const entity = entities.find(e => e.id === symbol);
-            if (entity) {
-                const componentArgs = this.components.map(c => entity.getComponent(c)) as C;
-                this.act(entity, ...componentArgs); // Call act with typed components
-            }
+    step(): void {
+        for (const entity of this.query.getEntities()) {
+            const componentArgs = this.components.map(c => entity.getComponent(c)) as C;
+            this.act(entity, ...componentArgs); // Call act with typed components
         }
     }
 
@@ -246,20 +192,74 @@ class System<C extends any[] = any> {
     }
 }
 
-export class Engine {
-    private _entities: EntityDef[] = [];
+class EventEmitter {
+    private listeners: Map<string, Set<Function>> = new Map();
+
+    on(event: string, callback: Function): void {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, new Set());
+        }
+        this.listeners.get(event)!.add(callback);
+    }
+
+    off(event: string, callback: Function): void {
+        const callbacks = this.listeners.get(event);
+        if (callbacks) {
+            callbacks.delete(callback);
+        }
+    }
+
+    emit(event: string, ...args: any[]): void {
+        const callbacks = this.listeners.get(event);
+        if (callbacks) {
+            for (const callback of callbacks) {
+                callback(...args);
+            }
+        }
+    }
+}
+
+class Query<C extends any[] = any[]> {
+    private matchingEntities: Set<Entity> = new Set();
+
+    constructor(private components: { [K in keyof C]: ComponentIdentifier<C[K]> }) { }
+
+    match(entity: Entity): boolean {
+        const matches = Object.values(this.components).every(type => entity.hasComponent(type));
+        if (matches) {
+            this.matchingEntities.add(entity);
+        } else {
+            this.matchingEntities.delete(entity);
+        }
+        return matches;
+    }
+
+    getEntities(): IterableIterator<Entity> {
+        return this.matchingEntities.values();
+    }
+}
+
+export class Engine extends EventEmitter {
+    private _queries: Query<any>[] = [];
     private _systems: System[] = [];
     private _steps: number = 0;
     private _active: boolean = false;
     private _entityManager: EntityManager = new EntityManager(this);
 
+    constructor() {
+        super();
+
+        this.on('onEntityCreated', (entity: Entity) => { this.updateQueries(entity); });
+        this.on('onEntityReleased', (entity: Entity) => { this.updateQueries(entity); });
+        this.on('onComponentAdded', (entity: Entity, type: Function) => { this.updateQueries(entity); })
+        this.on('onComponentRemoved', (entity: Entity, type: Function) => { this.updateQueries(entity); })
+    }
+
     /**
      * Creates and adds an Entity to the engine.
      */
     createEntity(): Entity {
-        const entity = this._entityManager.createEntity();
-        this._entities.push(entity);
-        return entity;
+        return this._entityManager.createEntity();
     }
 
     /**
@@ -284,6 +284,18 @@ export class Engine {
         return system as System<C>;
     }
 
+    createQuery<C extends any[] = any[]>(components: { [K in keyof C]: ComponentIdentifier<C[K]> }): Query<C> {
+        const query = new Query<C>(components);
+        this._queries.push(query);
+        return query;
+    }
+
+    private updateQueries(entity: Entity): void {
+        for (const query of this._queries) {
+            query.match(entity);
+        }
+    }
+
     /**
      * Runs the engine at a specified interval until maxSteps is reached.
      */
@@ -299,7 +311,6 @@ export class Engine {
 
         while (this._active) {
             this.perform();
-
             if ((this._steps < maxSteps && maxSteps !== 0) || maxSteps === 0) {
                 await sleep(interval);
             } else {
@@ -321,23 +332,16 @@ export class Engine {
         return this.componentArrays.get(type) as ComponentArray<T>;
     }
 
-    registerEvent(eventName: EngineEventNames, callback: EventCallback) {
-
-    }
-
     triggerEvent(eventName: EngineEventNames, ...args: any[]): void {
-        for (const system of this._systems) {
-            const method = system[eventName as keyof typeof system] as Function;
-            if (typeof method === "function") {
-                method.apply(system, args);
-            }
-        }
+        this.emit(eventName, ...args);
     }
 
     private perform(): void {
+        this.beforeStep();
         for (const system of this._systems) {
-            system.step(this._entities);
+            system.step();
         }
+        this.afterStep();
         this._steps++;
     }
 
