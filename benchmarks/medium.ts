@@ -2,7 +2,8 @@ import { Engine } from '../src/engine';
 import { random } from "./tools/random";
 import { Benchmark } from './tools/bencho';
 
-class SimpleComponent { constructor(public value: number) { } }
+class PositionComponent { constructor(public x: number, public y: number) { } }
+class VelocityComponent { constructor(public dx: number, public dy: number) { } }
 
 
 var benchmark = Benchmark.runMultiple("app", async b => {
@@ -14,9 +15,10 @@ var benchmark = Benchmark.runMultiple("app", async b => {
     });
 
     await b.section("systems", () => {
-        engine.createSystem([SimpleComponent], {
-            act: (_, component: SimpleComponent) => {
-                component.value += 1; // Simple operation
+        engine.createSystem([PositionComponent, VelocityComponent], {
+            act: (_, pos: PositionComponent, vel: VelocityComponent) => {
+                pos.x += vel.dx;
+                pos.y += vel.dy; // Complex operation: move entity by velocity
             },
         });
     });
@@ -26,7 +28,8 @@ var benchmark = Benchmark.runMultiple("app", async b => {
             await c.section(`entity_${i}`, async d => {
                 const entity = engine.createEntity();
                 await d.section("add_component", () => {
-                    entity.addComponent(SimpleComponent, random.next() * 100);
+                    entity.addComponent(PositionComponent, random.next() * 100, random.next() * 100);
+                    entity.addComponent(VelocityComponent, random.next() * 10, random.next() * 10);
                 });
             });
         }

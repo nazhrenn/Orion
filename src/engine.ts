@@ -28,8 +28,6 @@ class EntityManager {
 
     private activeEntities: Map<symbol, Entity> = new Map<symbol, Entity>();
 
-    private systems: System[] = [];
-
     private entityPool = new Pool<Entity>(
         () => {
             var entity = Entity.create(this, this.engine)
@@ -54,10 +52,6 @@ class EntityManager {
         this.notifySystems('onEntityReleased', entity);
     }
 
-    public registerSystem(system: System): void {
-        this.systems.push(system);
-    }
-
     // public updateSystems(entity: Entity): void {
     //     for (const system of this.systems) {
     //         const matchesSystem = Array.from(system.requiredComponents).every(componentType =>
@@ -72,11 +66,7 @@ class EntityManager {
     // }
 
     private notifySystems(eventName: 'onEntityCreated' | 'onEntityReleased', entity: Entity): void {
-        for (const system of this.systems) {
-            if (typeof system[eventName] === 'function') {
-                system[eventName](entity);
-            }
-        }
+        this.engine.triggerEvent(eventName, entity);
     }
 
     public cleanup(): void {
@@ -109,6 +99,8 @@ class Entity implements EntityDef {
         if (!this._components.has(type.name)) {
             this._components.set(type.name, new type(...args)); // Spread args to match constructor
             this._dirty = true;
+
+            this.engine.triggerEvent('onComponentAdded', this, type.name);
         }
         return this;
     }
@@ -117,6 +109,8 @@ class Entity implements EntityDef {
         if (this._components.has(componentName)) {
             this._components.delete(componentName);
             this._dirty = true;
+
+            this.engine.triggerEvent('onComponentRemoved', this, componentName);
         }
         return this;
     }
@@ -163,10 +157,10 @@ class System<C extends any[] = any> {
 
     constructor(private engine: Engine, ...componentsToPerform: { [K in keyof C]: ComponentIdentifier<C[K]> }) {
         this.components = componentsToPerform.map(component => System.getComponentName(component));
-        
+
         // Subscribe to entity creation and release events
-        this.engine.on('entityCreated', this.onEntityCreated.bind(this));
-        this.engine.on('entityReleased', this.onEntityReleased.bind(this));
+        this.engine.registerEvent('onEntityCreated', this.onEntityCreated.bind(this));
+        this.engine.registerEvent('onEntityReleased', this.onEntityReleased.bind(this));
     }
 
     private static getComponentName(component: ComponentIdentifier): string {
@@ -189,6 +183,22 @@ class System<C extends any[] = any> {
 
     onEntityReleased(entity: Entity): void {
         this.entitySymbols.delete(entity.id); // Remove the symbol
+    }
+
+    onComponentAdded(entity: Entity, componentName: string) {
+        if (this.components.includes(componentName)
+            && !this.entitySymbols.has(entity.id)
+            && this.components.every(c => entity.hasComponent(c))) {
+            this.entitySymbols.add(entity.id); // Store the symbol
+        }
+    }
+
+    onComponentRemoved(entity: Entity, componentName: string) {
+        if (this.components.includes(componentName)
+            && this.entitySymbols.has(entity.id)
+            && !this.components.every(c => entity.hasComponent(c))) {
+            this.entitySymbols.delete(entity.id); // Store the symbol
+        }
     }
 
     act(entity: EntityDef, ...components: C): void {
@@ -261,7 +271,7 @@ export class Engine {
     }
 
     private async runInternal(interval: number, maxSteps: number = 0, onComplete?: () => void): Promise<void> {
-        this.on('onStart')
+        this.triggerEvent('onStart')
 
         while (this._active) {
             this.perform();
@@ -273,12 +283,16 @@ export class Engine {
             }
         }
 
-        this.on('onStop')
+        this.triggerEvent('onStop')
 
         onComplete && onComplete();
     }
 
-    on(eventName: EngineEventNames, ...args: any[]): void {
+    registerEvent(eventName: EngineEventNames, callback: EventCallback) {
+
+    }
+
+    triggerEvent(eventName: EngineEventNames, ...args: any[]): void {
         for (const system of this._systems) {
             const method = system[eventName as keyof typeof system] as Function;
             if (typeof method === "function") {

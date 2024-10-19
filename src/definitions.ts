@@ -18,7 +18,7 @@ export interface EngineEvents {
     afterAct: EventCallback;
 }
 
-export type EngineEventNames = keyof EngineEvents | 'entityCreated' | 'entityReleased' | 'componentAdded' | 'componentRemoved';
+export type EngineEventNames = keyof EngineEvents | 'onEntityCreated' | 'onEntityReleased' | 'onComponentAdded' | 'onComponentRemoved';
 
 export interface EntityDef {
     id: symbol;
