@@ -154,6 +154,7 @@ class Entity implements EntityDef {
 class System<C extends any[] = any> {
     private components: string[];
     private entitySymbols: Set<symbol> = new Set();
+    private entityComponents: Map<symbol, C[]> = new Map();
 
     constructor(private engine: Engine, ...componentsToPerform: { [K in keyof C]: ComponentIdentifier<C[K]> }) {
         this.components = componentsToPerform.map(component => System.getComponentName(component));
@@ -190,6 +191,7 @@ class System<C extends any[] = any> {
             && !this.entitySymbols.has(entity.id)
             && this.components.every(c => entity.hasComponent(c))) {
             this.entitySymbols.add(entity.id); // Store the symbol
+            this.entityComponents.set(entity.id, this.components.map(c => entity.getComponent(c) as any));
         }
     }
 
@@ -198,6 +200,7 @@ class System<C extends any[] = any> {
             && this.entitySymbols.has(entity.id)
             && !this.components.every(c => entity.hasComponent(c))) {
             this.entitySymbols.delete(entity.id); // Store the symbol
+            this.entityComponents.delete(entity.id);
         }
     }
 
@@ -208,10 +211,8 @@ class System<C extends any[] = any> {
     step(entities: EntityDef[]): void {
         for (const symbol of this.entitySymbols) {
             const entity = entities.find(e => e.id === symbol);
-            if (entity) {
-                const componentArgs: C = [] as unknown as C; // Enforce typing
-
-                componentArgs.push(...this.components.map(c => entity.getComponent(c) as any));
+            if (entity && this.entityComponents.has(symbol)) {
+                const componentArgs: C = this.entityComponents.get(symbol) as unknown as C; // Enforce typing
                 this.act(entity, ...componentArgs); // Call act with typed components
             }
         }

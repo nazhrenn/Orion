@@ -33,7 +33,7 @@ var benchmark = Benchmark.runMultiple("app", async b => {
         engine.createSystem([PositionComponent, RenderComponent], {
             act: (_, pos: PositionComponent, render: RenderComponent) => {
                 // Render entity on screen
-              // console.log(`Rendering ${render.sprite} at (${pos.x}, ${pos.y})`);
+               console.log(`Rendering ${render.sprite} at (${pos.x}, ${pos.y})`);
             },
         });
     });
