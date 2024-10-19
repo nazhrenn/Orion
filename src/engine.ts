@@ -22,6 +22,29 @@ class Pool<T> {
     }
 }
 
+class ComponentArray<T> {
+    private components: (T | null)[] = [];
+    private freeIndices: number[] = [];
+
+    add(component: T): number {
+        if (this.freeIndices.length > 0) {
+            const index = this.freeIndices.pop()!;
+            this.components[index] = component;
+            return index;
+        }
+        return this.components.push(component) - 1;
+    }
+
+    remove(index: number): void {
+        this.components[index] = null;
+        this.freeIndices.push(index);
+    }
+
+    get(index: number): T | null {
+        return this.components[index];
+    }
+}
+
 class EntityManager {
     constructor(private engine: Engine) {
     }
@@ -82,7 +105,7 @@ class EntityManager {
 class Entity implements EntityDef {
     private readonly _id: symbol;
     private _dirty: boolean = false;
-    private _components: Map<string, any> = new Map();
+    private _componentIndices: Map<Function, number> = new Map();
     private _markedForDelete: boolean = false;
 
     private constructor(
@@ -96,31 +119,43 @@ class Entity implements EntityDef {
     }
 
     addComponent<T>(type: new (...args: any[]) => T, ...args: ConstructorParameters<typeof type>): this {
-        if (!this._components.has(type.name)) {
-            this._components.set(type.name, new type(...args)); // Spread args to match constructor
+        if (!this._componentIndices.has(type)) {
+            const componentArray = this.engine.getComponentArray(type);
+            const index = componentArray.add(new type(...args));
+            this._componentIndices.set(type, index);
             this._dirty = true;
-
-            this.engine.triggerEvent('onComponentAdded', this, type.name);
+            this.engine.triggerEvent('onComponentAdded', this, type);
         }
         return this;
     }
 
-    removeComponent(componentName: string): this {
-        if (this._components.has(componentName)) {
-            this._components.delete(componentName);
+    removeComponent<T>(type: new (...args: any[]) => T): this {
+        const index = this._componentIndices.get(type);
+        if (index !== undefined) {
+            const componentArray = this.engine.getComponentArray(type);
+            componentArray.remove(index);
+            this._componentIndices.delete(type);
             this._dirty = true;
-
-            this.engine.triggerEvent('onComponentRemoved', this, componentName);
+            this.engine.triggerEvent('onComponentRemoved', this, type);
         }
         return this;
     }
 
-    hasComponent(componentName: string): boolean {
-        return this._components.has(componentName);
+    hasComponent<T>(type: new (...args: any[]) => T): boolean {
+        return this._componentIndices.has(type);
     }
 
-    getComponent<T>(componentName: string): T | undefined {
-        return this._components.get(componentName) as T | undefined;
+    getComponent<T>(type: new (...args: any[]) => T): T {
+        const index = this._componentIndices.get(type);
+        if (index === undefined) {
+            throw new Error(`Component ${type.name} not found on entity`);
+        }
+        const componentArray = this.engine.getComponentArray(type);
+        const component = componentArray.get(index);
+        if (component === null) {
+            throw new Error(`Component ${type.name} is null`);
+        }
+        return component as T;
     }
 
     get isDirty(): boolean {
@@ -136,13 +171,10 @@ class Entity implements EntityDef {
     }
 
     /** @internal */
-    get components(): ReadonlyMap<string, any> {
-        return this._components;
-    }
-
-    /** @internal */
     reset(): void {
-        // Clear any existing state, remove components, etc.
+        this._componentIndices.clear();
+        this._dirty = false;
+        this._markedForDelete = false;
     }
 
     /** @internal */
@@ -152,28 +184,21 @@ class Entity implements EntityDef {
 }
 
 class System<C extends any[] = any> {
-    private components: string[];
+    private components: ComponentIdentifier[];
     private entitySymbols: Set<symbol> = new Set();
-    private entityComponents: Map<symbol, C[]> = new Map();
 
     constructor(private engine: Engine, ...componentsToPerform: { [K in keyof C]: ComponentIdentifier<C[K]> }) {
-        this.components = componentsToPerform.map(component => System.getComponentName(component));
+        this.components = componentsToPerform.map(component => {
+            if (typeof component === "function") {
+                return component;
+            } else {
+                throw new Error("Invalid component identifier");
+            }
+        });
 
         // Subscribe to entity creation and release events
         this.engine.registerEvent('onEntityCreated', this.onEntityCreated.bind(this));
         this.engine.registerEvent('onEntityReleased', this.onEntityReleased.bind(this));
-    }
-
-    private static getComponentName(component: ComponentIdentifier): string {
-        if (typeof component === "string") {
-            return component;
-        } else if (typeof component === "symbol") {
-            return component.toString(); // Convert symbol to string
-        } else if (typeof component === "function") {
-            return component.name; // Get the class name if it's a constructor
-        }
-
-        throw new Error("Invalid component identifier");
     }
 
     onEntityCreated(entity: Entity): void {
@@ -186,21 +211,19 @@ class System<C extends any[] = any> {
         this.entitySymbols.delete(entity.id); // Remove the symbol
     }
 
-    onComponentAdded(entity: Entity, componentName: string) {
-        if (this.components.includes(componentName)
+    onComponentAdded(entity: Entity, componentType: ComponentIdentifier) {
+        if (this.components.includes(componentType)
             && !this.entitySymbols.has(entity.id)
             && this.components.every(c => entity.hasComponent(c))) {
             this.entitySymbols.add(entity.id); // Store the symbol
-            this.entityComponents.set(entity.id, this.components.map(c => entity.getComponent(c) as any));
         }
     }
 
-    onComponentRemoved(entity: Entity, componentName: string) {
-        if (this.components.includes(componentName)
+    onComponentRemoved(entity: Entity, componentType: ComponentIdentifier) {
+        if (this.components.includes(componentType)
             && this.entitySymbols.has(entity.id)
             && !this.components.every(c => entity.hasComponent(c))) {
             this.entitySymbols.delete(entity.id); // Store the symbol
-            this.entityComponents.delete(entity.id);
         }
     }
 
@@ -211,8 +234,8 @@ class System<C extends any[] = any> {
     step(entities: EntityDef[]): void {
         for (const symbol of this.entitySymbols) {
             const entity = entities.find(e => e.id === symbol);
-            if (entity && this.entityComponents.has(symbol)) {
-                const componentArgs: C = this.entityComponents.get(symbol) as unknown as C; // Enforce typing
+            if (entity) {
+                const componentArgs = this.components.map(c => entity.getComponent(c)) as C;
                 this.act(entity, ...componentArgs); // Call act with typed components
             }
         }
@@ -287,6 +310,15 @@ export class Engine {
         this.triggerEvent('onStop')
 
         onComplete && onComplete();
+    }
+
+    private componentArrays: Map<Function, ComponentArray<any>> = new Map();
+
+    getComponentArray<T>(type: new (...args: any[]) => T): ComponentArray<T> {
+        if (!this.componentArrays.has(type)) {
+            this.componentArrays.set(type, new ComponentArray<T>());
+        }
+        return this.componentArrays.get(type) as ComponentArray<T>;
     }
 
     registerEvent(eventName: EngineEventNames, callback: EventCallback) {

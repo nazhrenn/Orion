@@ -1,5 +1,5 @@
 
-export type ComponentIdentifier<T = any> = string | Symbol | (new (...args: any[]) => T);
+export type ComponentIdentifier<T = any> = (new (...args: any[]) => T);
 export type ComponentArgs<T> = T extends new (...args: infer A) => any ? A : never;
 
 export type EventTypes<T = any> = string | Symbol | keyof T;
@@ -24,9 +24,9 @@ export interface EntityDef {
     id: symbol;
     queueFree(): void;
     addComponent<T>(type: new (...args: any[]) => T, ...args: ConstructorParameters<typeof type>): this;
-    removeComponent(componentName: string): this;
-    hasComponent(componentName: string): boolean;
-    getComponent<T>(componentName: string): T | undefined;
+    removeComponent<T>(type: new (...args: any[]) => T): this;
+    hasComponent<T>(type: new (...args: any[]) => T): boolean;
+    getComponent<T>(type: new (...args: any[]) => T): T;
     get isDirty(): boolean;
     get isMarkedForDeletion(): boolean;
 }
