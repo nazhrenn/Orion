@@ -1,8 +1,5 @@
 ﻿import type { ComponentIdentifier, EngineEventNames, EngineEvents, EntityDef, EventCallback, SystemType } from "./definitions";
 
-function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 class Pool<T> {
     private available: T[] = [];
@@ -242,17 +239,23 @@ class Query<C extends any[] = any[]> {
 export class Engine extends EventEmitter {
     private _queries: Query<any>[] = [];
     private _systems: System[] = [];
+    private _fixedUpdateSystems: System[] = [];
     private _steps: number = 0;
     private _active: boolean = false;
     private _entityManager: EntityManager = new EntityManager(this);
+    private _fixedUpdateAccumulator: number = 0;
+    private _fixedUpdateInterval: number = 1000 / 60; // 60 FPS by default
+    private _componentArrays: Map<Function, ComponentArray<any>> = new Map();
 
-    constructor() {
+    constructor(fixedUpdateFPS: number = 60) {
         super();
 
         this.on('onEntityCreated', (entity: Entity) => { this.updateQueries(entity); });
         this.on('onEntityReleased', (entity: Entity) => { this.updateQueries(entity); });
         this.on('onComponentAdded', (entity: Entity, type: Function) => { this.updateQueries(entity); })
         this.on('onComponentRemoved', (entity: Entity, type: Function) => { this.updateQueries(entity); })
+
+        this._fixedUpdateInterval = 1000 / fixedUpdateFPS;
     }
 
     /**
@@ -265,7 +268,7 @@ export class Engine extends EventEmitter {
     /**
      * Adds a System to the engine.
      */
-    createSystem<C extends any[] = any[]>(components: { [K in keyof C]: ComponentIdentifier<C[K]> }, options: SystemType): System<C> {
+    createSystem<C extends any[] = any[]>(components: { [K in keyof C]: ComponentIdentifier<C[K]> }, options: SystemType, isFixedUpdate: boolean = false): System<C> {
         // Spread the components as individual arguments when creating the System
         const system = new System<C>(this, ...components);  // Correctly passing individual components
 
@@ -279,7 +282,11 @@ export class Engine extends EventEmitter {
             }
         }
 
-        this._systems.push(mapped ? systemCallbacks as System<C> : system);
+        if (isFixedUpdate) {
+            this._fixedUpdateSystems.push(mapped ? systemCallbacks as System<C> : system);
+        } else {
+            this._systems.push(mapped ? systemCallbacks as System<C> : system);
+        }
 
         return system as System<C>;
     }
@@ -297,52 +304,60 @@ export class Engine extends EventEmitter {
     }
 
     /**
-     * Runs the engine at a specified interval until maxSteps is reached.
+     * Runs the engine for a single frame.
+     * @param deltaTime The time elapsed since the last frame in milliseconds.
      */
-    run(interval: number, maxSteps: number = 0): Promise<number> {
-        this._active = true;
-        return new Promise(async (resolve) => {
-            await this.runInternal(interval, maxSteps, () => resolve(this._steps));
-        });
-    }
-
-    private async runInternal(interval: number, maxSteps: number = 0, onComplete?: () => void): Promise<void> {
-        this.triggerEvent('onStart')
-
-        while (this._active) {
-            this.perform();
-            if ((this._steps < maxSteps && maxSteps !== 0) || maxSteps === 0) {
-                await sleep(interval);
-            } else {
-                this._active = false;
-            }
-        }
-
-        this.triggerEvent('onStop')
-
-        onComplete && onComplete();
-    }
-
-    private componentArrays: Map<Function, ComponentArray<any>> = new Map();
-
-    getComponentArray<T>(type: ComponentIdentifier): ComponentArray<T> {
-        if (!this.componentArrays.has(type)) {
-            this.componentArrays.set(type, new ComponentArray<T>());
-        }
-        return this.componentArrays.get(type) as ComponentArray<T>;
-    }
-
-    triggerEvent(eventName: EngineEventNames, ...args: any[]): void {
-        this.emit(eventName, ...args);
-    }
-
-    private perform(): void {
+    update(deltaTime: number): void {
         this.beforeStep();
+
+        // Update fixed update systems
+        this._fixedUpdateAccumulator += deltaTime;
+        while (this._fixedUpdateAccumulator >= this._fixedUpdateInterval) {
+            for (const system of this._fixedUpdateSystems) {
+                system.step();
+            }
+            this._fixedUpdateAccumulator -= this._fixedUpdateInterval;
+        }
+        // Update variable update systems
         for (const system of this._systems) {
             system.step();
         }
+
         this.afterStep();
         this._steps++;
+    }
+
+    /**
+     * Runs the engine in a loop until stop() is called.
+     */
+    run(): void {
+        this._active = true;
+        this.triggerEvent('onStart');
+
+        let lastTime = Date.now();
+        const loop = () => {
+            if (!this._active) {
+                this.triggerEvent('onStop');
+                return;
+            }
+
+            const currentTime = Date.now();
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            this.update(deltaTime);
+
+            setTimeout(loop, 1);
+        };
+
+        setTimeout(loop, 0);
+    }
+
+    /**
+     * Stops the engine's main loop.
+     */
+    stop(): void {
+        this._active = false;
     }
 
     private beforeStep(): void {
@@ -353,7 +368,22 @@ export class Engine extends EventEmitter {
         this._entityManager.cleanup();
     }
 
+    getComponentArray<T>(type: ComponentIdentifier): ComponentArray<T> {
+        if (!this._componentArrays.has(type)) {
+            this._componentArrays.set(type, new ComponentArray<T>());
+        }
+        return this._componentArrays.get(type) as ComponentArray<T>;
+    }
+
+    triggerEvent(eventName: EngineEventNames, ...args: any[]): void {
+        this.emit(eventName, ...args);
+    }
+
     get active(): boolean {
         return this._active;
+    }
+
+    get steps(): number {
+        return this._steps;
     }
 }

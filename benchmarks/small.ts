@@ -3,38 +3,46 @@ import { random } from "./tools/random";
 import { Benchmark } from './tools/bencho';
 
 class SimpleComponent { constructor(public value: number) { } }
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+};
+
+let totalRuns = 5;
+let totalStepsAccumulated = 0;
+let runTime = 5;
+
+async function runTests() {
 
 
-var benchmark = Benchmark.runMultiple("app", async b => {
-    random.reset();
-    let engine: Engine; // We'll initialize this in the run phase
+    for (let run = 0; run < totalRuns; run++) {
 
-    await b.section("setup", () => {
+        random.reset();
+        let engine: Engine; // We'll initialize this in the run phase
+
         engine = new Engine();
-    });
 
-    await b.section("systems", () => {
         engine.createSystem([SimpleComponent], {
             act: (_, component: SimpleComponent) => {
                 component.value += 1; // Simple operation
             },
         });
-    });
 
-    await b.section("entities", async c => {
         for (let i = 0; i < 10; i++) {
-            await c.section(`entity_${i}`, async d => {
-                const entity = engine.createEntity();
-                await d.section("add_component", () => {
-                    entity.addComponent(SimpleComponent, random.next() * 100);
-                });
-            });
+            const entity = engine.createEntity();
+            entity.addComponent(SimpleComponent, random.next() * 100);
         }
-    });
 
-    await b.section("run", async () => {
-        await engine.run(0, 50);
-    });
-}, 20);
+        engine.run();
+        // sleep for 5 seconds and see how many steps ran
+        await sleep(runTime * 1000);
+        engine.stop();
+        await sleep(150);
+        totalStepsAccumulated += engine.steps;
+        console.log(`Steps ran for run ${run + 1}: ${engine.steps}, with a fps of ${engine.steps / runTime}`);
+    }
+}
 
-Benchmark.results(benchmark);
+runTests().then(() => {
+    let averageSteps = totalStepsAccumulated / totalRuns;
+    console.log(`Average steps ran for all runs is ${averageSteps}, with a fps of ${averageSteps / runTime}`);
+});

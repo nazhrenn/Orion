@@ -155,4 +155,8 @@ export class Benchmark {
     private formatDuration(duration: number): string {
         return `${duration.toFixed(3)}ms`;
     }
+
+    sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 }

@@ -36,8 +36,14 @@ var benchmark = Benchmark.runMultiple("app", async b => {
     });
 
     await b.section("run", async () => {
-        await engine.run(0, 50);
+        let lastTime = performance.now();
+        for (var i = 0; i < 332; i++) {
+            const currentTime = performance.now();
+            const deltaTime = currentTime - lastTime;
+            await engine.update(deltaTime);
+            lastTime = currentTime;
+        }
     });
-}, 20);
+}, 5);
 
 Benchmark.results(benchmark);

@@ -23,7 +23,7 @@ var benchmark = Benchmark.runMultiple("app", async b => {
                 pos.y += vel.dy; // Complex operation: move entity by velocity
             },
         });
-        
+
         engine.createSystem([HealthComponent, AttackComponent, DefenseComponent], {
             act: (_, health: HealthComponent, attack: AttackComponent, defense: DefenseComponent) => {
                 health.health -= Math.max(0, attack.attackPower - defense.defense); // Combat simulation
@@ -33,30 +33,35 @@ var benchmark = Benchmark.runMultiple("app", async b => {
         engine.createSystem([PositionComponent, RenderComponent], {
             act: (_, pos: PositionComponent, render: RenderComponent) => {
                 // Render entity on screen
-               console.log(`Rendering ${render.sprite} at (${pos.x}, ${pos.y})`);
+                // console.log(`Rendering ${render.sprite} at (${pos.x}, ${pos.y})`);
             },
         });
     });
 
     await b.section("entities", async c => {
-        for (let i = 0; i < 10; i++) {
-            await c.section(`entity_${i}`, async d => {
-                const entity = engine.createEntity();
-                await d.section("add_component", () => {
-                    entity.addComponent(PositionComponent, random.next() * 100, random.next() * 100);
-                    entity.addComponent(VelocityComponent, random.next() * 10, random.next() * 10);
-                    entity.addComponent(HealthComponent, random.next() * 100);
-                    entity.addComponent(AttackComponent, random.next() * 50);
-                    entity.addComponent(DefenseComponent, random.next() * 20);
-                    entity.addComponent(RenderComponent, `entity_${i}`);
-                });
+        for (let i = 0; i < 100; i++) {
+            const entity = engine.createEntity();
+            await b.section("add_component", () => {
+                entity.addComponent(PositionComponent, random.next() * 100, random.next() * 100);
+                entity.addComponent(VelocityComponent, random.next() * 10, random.next() * 10);
+                entity.addComponent(HealthComponent, random.next() * 100);
+                entity.addComponent(AttackComponent, random.next() * 50);
+                entity.addComponent(DefenseComponent, random.next() * 20);
+                entity.addComponent(RenderComponent, `entity_${i}`);
             });
         }
     });
 
     await b.section("run", async () => {
-        await engine.run(0, 50);
+        let lastTime = performance.now();
+        for (var i = 0; i < 10_000; i++) {
+            const currentTime = performance.now();
+            const deltaTime = currentTime - lastTime;
+            await engine.update(deltaTime);
+            lastTime = currentTime;
+        }
     });
+    
 }, 5);
 
 Benchmark.results(benchmark);
